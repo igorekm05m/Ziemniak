@@ -6,7 +6,7 @@ module.exports = {
 // This is the name of the action displayed in the editor.
 //---------------------------------------------------------------------
 
-name: "Get Item from List",
+name: "Add Reaction",
 
 //---------------------------------------------------------------------
 // Action Section
@@ -14,7 +14,20 @@ name: "Get Item from List",
 // This is the section the action will fall into.
 //---------------------------------------------------------------------
 
-section: "Lists and Loops",
+section: "Reaction Control",
+
+//---------------------------------------------------------------------
+// Action Subtitle
+//
+// This function generates the subtitle displayed next to the name.
+//---------------------------------------------------------------------
+
+subtitle: function(data) {
+	const names = ['Command Message', 'Temp Variable', 'Server Variable', 'Global Variable'];
+	const index = parseInt(data.storage);
+	return data.storage === "0" ? `Add Reaction to ${names[index]}` : `Add Reaction to ${names[index]} (${data.varName})`;
+},
+
 
 //---------------------------------------------------------------------
 // DBM Mods Manager Variables (Optional but nice to have!)
@@ -24,62 +37,20 @@ section: "Lists and Loops",
 //---------------------------------------------------------------------
 
 // Who made the mod (If not set, defaults to "DBM Mods")
-author: "DBM & SeikiMatt",
+author: "DBM",
 
 // The version of the mod (Defaults to 1.0.0)
-version: "1.9", //Added in 1.9
+version: "1.9.1", //Added in 1.9.1
 
 // A short description to show on the mod line for this mod (Must be on a single line)
-short_description: "Fix for current beta version.",
+short_description: "Changed Category.",
 
 // If it depends on any other mods by name, ex: WrexMODS if the mod uses something from WrexMods
 
 
 //---------------------------------------------------------------------
 
-//---------------------------------------------------------------------
-// Action Subtitle
-//
-// This function generates the subtitle displayed next to the name.
-//---------------------------------------------------------------------
 
-subtitle: function(data) {
-	const list = ['Server Members', 'Server Channels', 'Server Roles', 'Server Emojis', 'All Bot Servers', 'Mentioned User Roles', 'Command Author Roles', 'Temp Variable', 'Server Variable', 'Global Variable'];
-	return `Get Item from ${list[parseInt(data.list)]}`;
-},
-
-//---------------------------------------------------------------------
-// Action Storage Function
-//
-// Stores the relevant variable info for the editor.
-//---------------------------------------------------------------------
-
-variableStorage: function(data, varType) {
-	const type = parseInt(data.storage);
-	if(type !== varType) return;
-	const list = parseInt(data.list);
-	let dataType = 'Unknown Type';
-	switch(list) {
-		case 0:
-			dataType = 'Server Member';
-			break;
-		case 1:
-			dataType = 'Channel';
-			break;
-		case 2:
-		case 5:
-		case 6:
-			dataType = 'Role';
-			break;
-		case 3:
-			dataType = 'Emoji';
-			break;
-		case 4:
-			dataType = 'Server';
-			break;
-	}
-	return ([data.varName2, dataType]);
-},
 
 //---------------------------------------------------------------------
 // Action Fields
@@ -89,7 +60,7 @@ variableStorage: function(data, varType) {
 // are also the names of the fields stored in the action's JSON data.
 //---------------------------------------------------------------------
 
-fields: ["list", "varName", "getType", "position", "storage", "varName2"],
+fields: ["storage", "varName", "emoji", "varName2", "varName3"],
 
 //---------------------------------------------------------------------
 // Command HTML
@@ -111,9 +82,9 @@ html: function(isEvent, data) {
 	return `
 <div>
 	<div style="float: left; width: 35%;">
-		Source List:<br>
-		<select id="list" class="round" onchange="glob.listChange(this, 'varNameContainer')">
-			${data.lists[isEvent ? 1 : 0]}
+		Source Message:<br>
+		<select id="storage" class="round" onchange="glob.messageChange(this, 'varNameContainer')">
+			${data.messages[isEvent ? 1 : 0]}
 		</select>
 	</div>
 	<div id="varNameContainer" style="display: none; float: right; width: 60%;">
@@ -122,30 +93,23 @@ html: function(isEvent, data) {
 	</div>
 </div><br><br><br>
 <div style="padding-top: 8px;">
-	<div style="float: left; width: 45%;">
-		Item to Store:<br>
-		<select id="getType" class="round" onchange="glob.onChange1(this)">
-			<option value="0" selected>First Item</option>
-			<option value="1">Last Item</option>
-			<option value="2">Random Item</option>
-			<option value="3">Item at Position</option>
-		</select>
-	</div>
-	<div id="positionHolder" style="float: right; width: 50%; display: none;">
-		Position:<br>
-		<input id="position" class="round" type="text"><br>
-	</div>
-</div><br><br><br>
-<div style="padding-top: 8px;">
 	<div style="float: left; width: 35%;">
-		Store In:<br>
-		<select id="storage" class="round">
-			${data.variables[1]}
+		Source Emoji:<br>
+		<select id="emoji" name="second-list" class="round" onchange="glob.onChange1(this)">
+			<option value="4" selected>Direct Emoji</option>
+			<option value="0">Custom Emoji</option>
+			<option value="1">Temp Variable</option>
+			<option value="2">Server Variable</option>
+			<option value="3">Global Variable</option>
 		</select>
 	</div>
 	<div id="varNameContainer2" style="float: right; width: 60%;">
-		Variable Name:<br>
+		<span id="extName">Emoji  (right-click -> Insert Emoji)</span>:<br>
 		<input id="varName2" class="round" type="text">
+	</div>
+	<div id="varNameContainer3" style="float: right; width: 60%; display: none;">
+		Variable Name:<br>
+		<input id="varName3" class="round" type="text" list="variableList2">
 	</div>
 </div>`
 },
@@ -163,16 +127,24 @@ init: function() {
 
 	glob.onChange1 = function(event) {
 		const value = parseInt(event.value);
-		const dom = document.getElementById('positionHolder');
-		if(value < 3) {
-			dom.style.display = 'none';
+		const varNameInput = document.getElementById("extName");
+		if(value === 0) {
+			varNameInput.innerHTML = "Emoji Name";
+			document.getElementById('varNameContainer3').style.display = 'none';
+			document.getElementById('varNameContainer2').style.display = null;
+		} else if(value === 4) {
+			varNameInput.innerHTML = "Emoji  (right-click -> Insert Emoji)";
+			document.getElementById('varNameContainer3').style.display = 'none';
+			document.getElementById('varNameContainer2').style.display = null;
 		} else {
-			dom.style.display = null;
+			glob.onChangeBasic(event, "varNameContainer3");
+			document.getElementById('varNameContainer3').style.display = null;
+			document.getElementById('varNameContainer2').style.display = 'none';
 		}
 	};
 
-	glob.listChange(document.getElementById('list'), 'varNameContainer');
-	glob.onChange1(document.getElementById('getType'));
+	glob.onChange1(document.getElementById('emoji'));
+	glob.messageChange(document.getElementById('storage'), 'varNameContainer');
 },
 
 //---------------------------------------------------------------------
@@ -184,50 +156,33 @@ init: function() {
 //---------------------------------------------------------------------
 
 action: function(cache) {
-    const data = cache.actions[cache.index];
-    const storage = parseInt(data.list);
-    const varName = this.evalMessage(data.varName, cache);
-    const list = this.getList(storage, varName, cache);
+	const data = cache.actions[cache.index];
+	const storage = parseInt(data.storage);
+	const varName = this.evalMessage(data.varName, cache);
+	const message = this.getMessage(storage, varName, cache);
 
-    const type = parseInt(data.getType);
-    let result;
-    switch (type) {
-      case 0:
-        result = list[0];
-        break;
-      case 1:
-        result = list[list.length - 1];
-        break;
-      case 2:
-        result = list[Math.floor(Math.random() * list.length)];
-        break;
-      case 3:
-        const posout = this.evalMessage(data.position, cache);
+	const type = parseInt(data.emoji);
+	let emoji;
+	if(type === 4) {
+		emoji = this.evalMessage(data.varName2, cache);
+	} else if(type === 0) {
+		emoji = this.getDBM().Bot.bot.emojis.find('name', this.evalMessage(data.varName2, cache));
+	} else {
+		emoji = this.getVariable(type, this.evalMessage(data.varName3, cache), cache);
+	}
 
-        if (typeof posout === "string") {
-          var position = parseInt(posout);
-        } else {
-          var position = posout;
-        }
-
-        if (position < 0) {
-          result = list[0];
-        } else if (position >= list.length) {
-          result = list[list.length - 1];
-        } else {
-          result = list[position];
-        }
-        break;
-    }
-
-    if (result) {
-      const varName2 = this.evalMessage(data.varName2, cache);
-      const storage2 = parseInt(data.storage);
-      this.storeValue(result, storage2, varName2, cache);
-    }
-
-    this.callNextAction(cache);
-  },
+	if(Array.isArray(message)) {
+		this.callListFunc(message, 'react', [emoji]).then(function() {
+			this.callNextAction(cache);
+		}.bind(this));
+	} else if(emoji && message && message.react) {
+		message.react(emoji).then(function() {
+			this.callNextAction(cache);
+		}.bind(this)).catch(this.displayError.bind(this, data, cache));
+	} else {
+		this.callNextAction(cache);
+	}
+},
 
 //---------------------------------------------------------------------
 // Action Bot Mod

@@ -6,7 +6,7 @@ module.exports = {
 // This is the name of the action displayed in the editor.
 //---------------------------------------------------------------------
 
-name: "Create Embed Message",
+name: "Find Message",
 
 //---------------------------------------------------------------------
 // Action Section
@@ -14,7 +14,7 @@ name: "Create Embed Message",
 // This is the section the action will fall into.
 //---------------------------------------------------------------------
 
-section: "Embed Message",
+section: "Messaging",
 
 //---------------------------------------------------------------------
 // Action Subtitle
@@ -23,10 +23,12 @@ section: "Embed Message",
 //---------------------------------------------------------------------
 
 subtitle: function(data) {
-	return `${data.title}`;
+	const channels = ['Same Channel', 'Mentioned Channel', '1st Server Channel', 'Temp Variable', 'Server Variable', 'Global Variable'];
+	const info = ['Find by Content', 'Find by ID'];
+	return `${channels[parseInt(data.channel)]} - ${info[parseInt(data.info)]}`;
 },
 
-//---------------------------------------------------------------------
+	//---------------------------------------------------------------------
 	 // DBM Mods Manager Variables (Optional but nice to have!)
 	 //
 	 // These are variables that DBM Mods Manager uses to show information
@@ -34,18 +36,19 @@ subtitle: function(data) {
 	 //---------------------------------------------------------------------
 
 	 // Who made the mod (If not set, defaults to "DBM Mods")
-	 author: "DBM",
+	 author: "Lasse",
 
 	 // The version of the mod (Defaults to 1.0.0)
-	 version: "1.8.2",
+	 version: "1.8.7", //Added in 1.8.5
 
 	 // A short description to show on the mod line for this mod (Must be on a single line)
-	 short_description: "Changed category",
+	 short_description: "Finds a message by content or ID.",
 
 	 // If it depends on any other mods by name, ex: WrexMODS if the mod uses something from WrexMods
 
 
 	 //---------------------------------------------------------------------
+
 
 //---------------------------------------------------------------------
 // Action Storage Function
@@ -56,7 +59,9 @@ subtitle: function(data) {
 variableStorage: function(data, varType) {
 	const type = parseInt(data.storage);
 	if(type !== varType) return;
-	return ([data.varName, 'Embed Message']);
+	const info = parseInt(data.info);
+	let dataType = 'Message';
+	return ([data.varName2, dataType]);
 },
 
 //---------------------------------------------------------------------
@@ -67,7 +72,7 @@ variableStorage: function(data, varType) {
 // are also the names of the fields stored in the action's JSON data.
 //---------------------------------------------------------------------
 
-fields: ["title", "author", "color", "timestamp", "url", "authorIcon", "imageUrl", "thumbUrl", "storage", "varName"],
+fields: ["channel", "varName", "info", "search", "storage", "varName2"],
 
 //---------------------------------------------------------------------
 // Command HTML
@@ -87,29 +92,39 @@ fields: ["title", "author", "color", "timestamp", "url", "authorIcon", "imageUrl
 
 html: function(isEvent, data) {
 	return `
-<div style="float: left; width: 50%;">
-	Title:<br>
-	<input id="title" class="round" type="text"><br>
-	Author:<br>
-	<input id="author" class="round" type="text" placeholder="Leave blank to disallow author!"><br>
-	Color:<br>
-	<input id="color" class="round" type="text" placeholder="Leave blank for default!"><br>
-	Use Timestamp:<br>
-	<select id="timestamp" class="round" style="width: 90%;">
-		<option value="true">Yes</option>
-		<option value="false" selected>No</option>
-	</select><br>
-</div>
-<div style="float: right; width: 50%;">
-	URL:<br>
-	<input id="url" class="round" type="text" placeholder="Leave blank for none!"><br>
-	Author Icon URL:<br>
-	<input id="authorIcon" class="round" type="text" placeholder="Leave blank for none!"><br>
-	Image URL:<br>
-	<input id="imageUrl" class="round" type="text" placeholder="Leave blank for none!"><br>
-	Thumbnail URL:<br>
-	<input id="thumbUrl" class="round" type="text" placeholder="Leave blank for none!"><br>
-</div>
+<div id ="wrexdiv" style="width: 550px; height: 350px; overflow-y: scroll;">
+	<div>
+	<p>
+		<u>Mod Info:</u><br>
+		Created by Lasse!
+		Modified by General Wrex!
+	</p>
+</div><br>
+<div>
+	<div style="float: left; width: 35%;">
+		Source Channel:<br>
+		<select id="channel" class="round" onchange="glob.channelChange(this, 'varNameContainer')">
+			${data.channels[isEvent ? 1 : 0]}
+		</select>
+	</div>
+	<div id="varNameContainer" style="display: none; float: right; width: 60%;">
+		Variable Name:<br>
+		<input id="varName" class="round" type="text" list="variableList"><br>
+	</div>
+</div><br><br><br>
+<div>
+	<div style="float: left; width: 70%;">
+		Find by:<br>
+		<select id="info" class="round">
+			<option value="0" selected>Find by Content</option>
+			<option value="1">Find by ID</option>
+		</select>
+	</div><br><br><br>
+	<div style="float: left; width: 70%;">
+		Search for:<br>
+		<input id="search" class="round" type="text"><br>
+	</div>
+</div><br>
 <div>
 	<div style="float: left; width: 35%;">
 		Store In:<br>
@@ -117,11 +132,17 @@ html: function(isEvent, data) {
 			${data.variables[1]}
 		</select>
 	</div>
-	<div id="varNameContainer" style="float: right; width: 60%;">
+	<div id="varNameContainer2" style="float: right; width: 60%;">
 		Variable Name:<br>
-		<input id="varName" class="round" type="text"><br>
+		<input id="varName2" class="round" type="text"><br>
 	</div>
-</div>`
+</div><br><br><br>
+<div>
+	<p>
+	<u>Note:</u><br>
+	This mod can only find messages by <b>content</b> within the last 100 messages.<br>
+	If there are multiple messages with the same content, the bot is always using the oldest message (after start).
+</div>`;
 },
 
 //---------------------------------------------------------------------
@@ -133,6 +154,9 @@ html: function(isEvent, data) {
 //---------------------------------------------------------------------
 
 init: function() {
+	const {glob, document} = this;
+
+	glob.channelChange(document.getElementById('channel'), 'varNameContainer');
 },
 
 //---------------------------------------------------------------------
@@ -145,30 +169,47 @@ init: function() {
 
 action: function(cache) {
 	const data = cache.actions[cache.index];
-	const embed = this.createEmbed();
-	embed.setTitle(this.evalMessage(data.title, cache));
-	if(data.url) {
-		embed.setURL(this.evalMessage(data.url, cache));
-	}
-	if(data.author && data.authorIcon) {
-		embed.setAuthor(this.evalMessage(data.author, cache), this.evalMessage(data.authorIcon, cache));
-	}
-	if(data.color) {
-		embed.setColor(this.evalMessage(data.color, cache));
-	}
-	if(data.imageUrl) {
-		embed.setImage(this.evalMessage(data.imageUrl, cache));
-	}
-	if(data.thumbUrl) {
-		embed.setThumbnail(this.evalMessage(data.thumbUrl, cache));
-	}
-	if(data.timestamp === "true") {
-		embed.setTimestamp(new Date());
-	}
-	const storage = parseInt(data.storage);
+	const channel = parseInt(data.channel);
 	const varName = this.evalMessage(data.varName, cache);
-	this.storeValue(embed, storage, varName, cache);
-	this.callNextAction(cache);
+	const info = parseInt(data.info);
+	const search = this.evalMessage(data.search, cache);
+	const targetChannel = this.getChannel(channel, varName, cache);
+	if(!targetChannel) {
+		this.callNextAction(cache);
+		return;
+	}
+
+	const storage = parseInt(data.storage);
+	const varName2 = this.evalMessage(data.varName2, cache);
+
+	let result;
+	switch(info) {
+		case 0:
+			targetChannel.fetchMessages({ limit: 100 }).then(messages =>{
+				const message = messages.find(el => el.content.includes(search));			
+				if(message !== undefined){
+					this.storeValue(message, storage, varName2, cache);						
+				}
+				this.callNextAction(cache);
+			}).catch(err=>{
+				console.error(err); 
+				this.callNextAction(cache);
+			});	
+			break;
+		case 1:
+			targetChannel.fetchMessage(search).then(message =>{			
+				if(message !== undefined){
+					this.storeValue(message, storage, varName2, cache);
+				}						
+				this.callNextAction(cache);
+			}).catch(err=>{
+				console.error(err); 
+				this.callNextAction(cache);
+			});	
+			break;
+		default:
+			break;
+	}
 },
 
 //---------------------------------------------------------------------
@@ -181,12 +222,6 @@ action: function(cache) {
 //---------------------------------------------------------------------
 
 mod: function(DBM) {
-	const DiscordJS = DBM.DiscordJS;
-	const Actions = DBM.Actions;
-
-	Actions.createEmbed = function() {
-		return new DiscordJS.RichEmbed();
-	};
 }
 
 }; // End of module

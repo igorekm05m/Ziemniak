@@ -6,7 +6,7 @@ module.exports = {
 // This is the name of the action displayed in the editor.
 //---------------------------------------------------------------------
 
-name: "Create Embed Message",
+name: "Clear reactions from message",
 
 //---------------------------------------------------------------------
 // Action Section
@@ -14,7 +14,7 @@ name: "Create Embed Message",
 // This is the section the action will fall into.
 //---------------------------------------------------------------------
 
-section: "Embed Message",
+section: "Reaction Control",
 
 //---------------------------------------------------------------------
 // Action Subtitle
@@ -23,7 +23,9 @@ section: "Embed Message",
 //---------------------------------------------------------------------
 
 subtitle: function(data) {
-	return `${data.title}`;
+	const names = ['Command Message', 'Temp Variable', 'Server Variable', 'Global Variable'];
+	const index = parseInt(data.storage);
+	return `Remove reactions from Message`;
 },
 
 //---------------------------------------------------------------------
@@ -34,30 +36,18 @@ subtitle: function(data) {
 	 //---------------------------------------------------------------------
 
 	 // Who made the mod (If not set, defaults to "DBM Mods")
-	 author: "DBM",
+	 author: "Lasse",
 
 	 // The version of the mod (Defaults to 1.0.0)
 	 version: "1.8.2",
 
 	 // A short description to show on the mod line for this mod (Must be on a single line)
-	 short_description: "Changed category",
+	 short_description: "Removes all reactions from a message",
 
 	 // If it depends on any other mods by name, ex: WrexMODS if the mod uses something from WrexMods
 
 
 	 //---------------------------------------------------------------------
-
-//---------------------------------------------------------------------
-// Action Storage Function
-//
-// Stores the relevant variable info for the editor.
-//---------------------------------------------------------------------
-
-variableStorage: function(data, varType) {
-	const type = parseInt(data.storage);
-	if(type !== varType) return;
-	return ([data.varName, 'Embed Message']);
-},
 
 //---------------------------------------------------------------------
 // Action Fields
@@ -67,7 +57,7 @@ variableStorage: function(data, varType) {
 // are also the names of the fields stored in the action's JSON data.
 //---------------------------------------------------------------------
 
-fields: ["title", "author", "color", "timestamp", "url", "authorIcon", "imageUrl", "thumbUrl", "storage", "varName"],
+fields: ["storage", "varName"],
 
 //---------------------------------------------------------------------
 // Command HTML
@@ -87,39 +77,22 @@ fields: ["title", "author", "color", "timestamp", "url", "authorIcon", "imageUrl
 
 html: function(isEvent, data) {
 	return `
-<div style="float: left; width: 50%;">
-	Title:<br>
-	<input id="title" class="round" type="text"><br>
-	Author:<br>
-	<input id="author" class="round" type="text" placeholder="Leave blank to disallow author!"><br>
-	Color:<br>
-	<input id="color" class="round" type="text" placeholder="Leave blank for default!"><br>
-	Use Timestamp:<br>
-	<select id="timestamp" class="round" style="width: 90%;">
-		<option value="true">Yes</option>
-		<option value="false" selected>No</option>
-	</select><br>
-</div>
-<div style="float: right; width: 50%;">
-	URL:<br>
-	<input id="url" class="round" type="text" placeholder="Leave blank for none!"><br>
-	Author Icon URL:<br>
-	<input id="authorIcon" class="round" type="text" placeholder="Leave blank for none!"><br>
-	Image URL:<br>
-	<input id="imageUrl" class="round" type="text" placeholder="Leave blank for none!"><br>
-	Thumbnail URL:<br>
-	<input id="thumbUrl" class="round" type="text" placeholder="Leave blank for none!"><br>
-</div>
+	<div>
+		<p>
+			<u>Mod Info:</u><br>
+			Created by Lasse!
+		</p>
+	</div><br>
 <div>
 	<div style="float: left; width: 35%;">
-		Store In:<br>
-		<select id="storage" class="round">
-			${data.variables[1]}
+		Source Message:<br>
+		<select id="storage" class="round" onchange="glob.messageChange(this, 'varNameContainer')">
+			${data.messages[isEvent ? 1 : 0]}
 		</select>
 	</div>
-	<div id="varNameContainer" style="float: right; width: 60%;">
+	<div id="varNameContainer" style="display: none; float: right; width: 60%;">
 		Variable Name:<br>
-		<input id="varName" class="round" type="text"><br>
+		<input id="varName" class="round" type="text" list="variableList"><br>
 	</div>
 </div>`
 },
@@ -133,6 +106,9 @@ html: function(isEvent, data) {
 //---------------------------------------------------------------------
 
 init: function() {
+	const {glob, document} = this;
+
+	glob.messageChange(document.getElementById('storage'), 'varNameContainer');
 },
 
 //---------------------------------------------------------------------
@@ -145,30 +121,20 @@ init: function() {
 
 action: function(cache) {
 	const data = cache.actions[cache.index];
-	const embed = this.createEmbed();
-	embed.setTitle(this.evalMessage(data.title, cache));
-	if(data.url) {
-		embed.setURL(this.evalMessage(data.url, cache));
-	}
-	if(data.author && data.authorIcon) {
-		embed.setAuthor(this.evalMessage(data.author, cache), this.evalMessage(data.authorIcon, cache));
-	}
-	if(data.color) {
-		embed.setColor(this.evalMessage(data.color, cache));
-	}
-	if(data.imageUrl) {
-		embed.setImage(this.evalMessage(data.imageUrl, cache));
-	}
-	if(data.thumbUrl) {
-		embed.setThumbnail(this.evalMessage(data.thumbUrl, cache));
-	}
-	if(data.timestamp === "true") {
-		embed.setTimestamp(new Date());
-	}
 	const storage = parseInt(data.storage);
 	const varName = this.evalMessage(data.varName, cache);
-	this.storeValue(embed, storage, varName, cache);
-	this.callNextAction(cache);
+	const message = this.getMessage(storage, varName, cache);
+	if(Array.isArray(message)) {
+		this.callListFunc(message, 'clearReactions', []).then(function() {
+			this.callNextAction(cache);
+		}.bind(this));
+	} else if(message && message.clearReactions) {
+		message.clearReactions().then(function() {
+			this.callNextAction(cache);
+		}.bind(this)).catch(this.displayError.bind(this, data, cache));
+	} else {
+		this.callNextAction(cache);
+	}
 },
 
 //---------------------------------------------------------------------
@@ -181,12 +147,6 @@ action: function(cache) {
 //---------------------------------------------------------------------
 
 mod: function(DBM) {
-	const DiscordJS = DBM.DiscordJS;
-	const Actions = DBM.Actions;
-
-	Actions.createEmbed = function() {
-		return new DiscordJS.RichEmbed();
-	};
 }
 
 }; // End of module
